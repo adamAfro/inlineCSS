@@ -1,135 +1,12 @@
-import { DOMParser, Element, Document } from "https://deno.land/x/deno_dom@v0.1.35-alpha/deno-dom-wasm.ts"
-
-export default function html(strings: TemplateStringsArray, ...values: any[]) {
-
-    const html = String.raw({ raw: strings }, ...values)
-    const document = new DOMParser().parseFromString(html, "text/html")
-    if (!document)
-        return ""
-
-    applyInlineCSS(document)
-
-    return "<!DOCTYPE html>" + document.head.outerHTML + document.body.outerHTML
-}
-
-function applyInlineCSS(document: Document) {
-
-    if (!document)
-        return
-
-    const classNames: string[] = ["", "medium-", "narrow-", "wide-", "widest-"]
-    const inline = {
-        base: getInlineCSS(document.body),
-        rules: {
-            narrow: getInlineCSS(document.body, "narrow-"),
-            medium: getInlineCSS(document.body, "medium-"),
-            wide: getInlineCSS(document.body, "wide-"),
-            widest: getInlineCSS(document.body, "widest-")
-        }
-    }
-
-    document.head.innerHTML += /*html*/`<style>
-
-        ${inline.base
-            .map(([el, props], i) => createCSS({ el, props }, i, classNames))
-            .join("\n")}
-
-        @media screen and (min-width: 24em) {
-            ${inline.rules.narrow.map(([el, props], i) => createCSS({ el, props }, i, classNames, "narrow-")).join("\n") || ""}
-        }
-
-        @media screen and (min-width: 48em) {
-            ${inline.rules.medium.map(([el, props], i) => createCSS({ el, props }, i, classNames, "medium-")).join("\n") || ""}
-        } 
-
-        @media screen and (min-width: 86em) {
-            ${inline.rules.wide.map(([el, props], i) => createCSS({ el, props }, i, classNames, "wide-")).join("\n") || ""}
-        }
-
-        @media screen and (min-width: 148em) {
-            ${inline.rules.widest.map(([el, props], i) => createCSS({ el, props }, i, classNames, "widest-")).join("\n") || ""}
-        }
-    </style>`
-}
-
-
-function createCSS(target: { el: Element, props: Map <string, string> }, i: number, classNames: string[], name = "") {
-
-    let className = generateUniqueCSSName(target.props, i, classNames, name)
-    
-    target.el.classList.add(className)
-
-    let css = ""
-    for (const [name, value] of target.props)
-        css += name + ':' + value + ";"
-
-    return `.${className}{${css}}\n`
-}
-
-function generateUniqueCSSName(properties: Map<string, string>, i: number, classNames: string[], className = "") {
-
-    const propNames = Array.from(properties.keys())
-    for (let i = 0, n = CSSNamingOrder.length, k = 0; i < n && (k < 2 || classNames.includes(className)) && k < 5; i++) {
-
-        const order = CSSNamingOrder[i]
-        const name = propNames.find(name => order.properties.includes(name))
-        if (name) {
-            
-            k++
-            if (order.preview)
-                className += properties.get(name) + "-"
-
-            else if (order.replacement)
-                className += order.replacement + "-"
-        }
-    }
-
-    classNames.push(className)
-        
-    return `${className.slice(0, -1)}-${i+1}`
-}
-
-function getInlineCSS(container: Element, prefix = "") {
-
-    return Array.from(takeInlineCSS(container, prefix))
-}
-
-function takeInlineCSS(container: Element, prefix = "") {
-
-    const inline: Map<Element, Map<string, string> > = new Map()
-
-    for (const property of CSSProperties) {
-
-        const collection = [...container.querySelectorAll(`[${prefix}${property}]`)] as Element[]
-        if (container.hasAttribute(`${prefix}${property}`))
-            collection.push(container)
-
-
-        for (const element of collection) {
-
-            let styles = inline.get(element)
-            if (!styles) {
-
-                styles = new Map()
-                inline.set(element, styles)
-            }
-
-            styles.set(property, element.getAttribute(prefix + property) as string)
-            element.removeAttribute(prefix + property)
-        }
-    }
-
-    return inline
-}
-
-
+/** Properties and their values */
+export type Properties = Map<string, string>
 
 /** 
  * the smaller index the more important is property in naming process 
  * 
  * valueOriented - value is key feature in naming process
  * */
-const CSSNamingOrder: {
+export const CSSNamingOrder: {
 
     /** CSS properties */
     properties: string[], 
@@ -1481,4 +1358,4 @@ const CSSNamingOrder: {
     ] }
 ]
 
-const CSSProperties = CSSNamingOrder.map(({ properties }) => properties).flat()
+export const CSSProperties = CSSNamingOrder.map(({ properties }) => properties).flat()
